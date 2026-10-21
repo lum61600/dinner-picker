@@ -521,7 +521,7 @@ function blank(){
 /* ── Supabase 設定（只有這兩行要填） ── */
 const SUPA_URL = 'https://huejxwapgrwwpeouetac.supabase.co';
 const SUPA_KEY = 'sb_publishable_BbcWo67eO4TuSI8zWx6QRw_U6JDnoj3';
-const TABLE = 'dinner_sessions';
+const TABLE = 'dinner_sessions';   // 僅供參考，讀寫一律走 get_dinner / put_dinner 兩支函式
 
 /* ── 這一次投票的編號，掛在網址 ?s= 上 ── */
 let SID = new URLSearchParams(location.search).get('s') || '';
@@ -546,11 +546,11 @@ function dbFail(e){
 async function load(){
   if(!ready() || !SID) return null;
   try{
-    const res = await fetch(SUPA_URL+'/rest/v1/'+TABLE+'?id=eq.'+encodeURIComponent(SID)+'&select=data',
-      { headers: heads() });
+    const res = await fetch(SUPA_URL+'/rest/v1/rpc/get_dinner',
+      { method:'POST', headers: heads(), body: JSON.stringify({ sid: SID }) });
     if(!res.ok) throw new Error('HTTP '+res.status);
-    const rows = await res.json();
-    return (rows && rows[0]) ? rows[0].data : null;
+    const data = await res.json();
+    return data || null;
   }catch(e){
     console.error(e);
     return null;
@@ -561,10 +561,9 @@ async function save(){
   if(!ready()){ flash('還沒填 Supabase 專案網址，資料存不起來。','warn'); return false; }
   if(!SID) SID = newSid();
   try{
-    const res = await fetch(SUPA_URL+'/rest/v1/'+TABLE,
-      { method:'POST',
-        headers: heads({ 'Prefer':'resolution=merge-duplicates,return=minimal' }),
-        body: JSON.stringify({ id:SID, data:S, updated_at:S.updatedAt }) });
+    const res = await fetch(SUPA_URL+'/rest/v1/rpc/put_dinner',
+      { method:'POST', headers: heads(),
+        body: JSON.stringify({ sid: SID, payload: S }) });
     if(!res.ok){
       const t = await res.text();
       throw new Error('HTTP '+res.status+' '+t.slice(0,120));
