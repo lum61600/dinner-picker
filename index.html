@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow, noarchive">
 <title>聚餐選店助手 · 客資部</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -338,7 +339,7 @@ a.btn{text-decoration:none;display:inline-block}
       </div>
     </div>
 
-    <details class="notes" id="notesBox">
+    <details class="notes hide" id="notesBox">
       <summary>聚餐須知<span class="tag">預算・假單・12 月停辦</span></summary>
       <ul>
         <li><b>單數月</b>決定聚餐地點和日期，選 4 天日期在群組通知大家投票。</li>
@@ -474,7 +475,7 @@ a.btn{text-decoration:none;display:inline-block}
     </section>
   </div>
 
-  <p class="footer">客資部聚餐輪值　Tobey　婧菱　Nana</p>
+  <p class="footer hide" id="footerNote">客資部聚餐輪值　Tobey　婧菱　Nana</p>
 
   <div id="calPop" class="calpop hide">
     <div class="calhead">
@@ -859,7 +860,7 @@ async function rollFromMap(){
     return;
   }
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span>載入中…';
-  rollNote('正在向 OpenStreetMap 查「'+area+'」附近的餐廳，載入中…');
+  rollNote('正在向 OpenStreetMap 查「'+esc(area)+'」附近的餐廳，載入中…');
   try{
     const c = await geocode(area);
     let got = [], host = '';
@@ -872,7 +873,7 @@ async function rollFromMap(){
     mapCache = { key:key, list:got };
     pickFromMap(got, area, cui, false, host);
   }catch(e){
-    rollNote('地圖抓不到：'+e.message+'。<br>這個功能要連到 OpenStreetMap，在 Claude 的預覽視窗裡通常會被擋掉——把檔案下載下來用瀏覽器打開，或部署到 Cloudflare Pages 就會正常。先按「🎲 店家清單抽 4 間」也可以。', true);
+    rollNote('地圖抓不到：'+esc(e.message)+'。<br>這個功能要連到 OpenStreetMap，在 Claude 的預覽視窗裡通常會被擋掉——把檔案下載下來用瀏覽器打開，或部署到 Cloudflare Pages 就會正常。先按「🎲 店家清單抽 4 間」也可以。', true);
     console.error(e);
   }
   btn.disabled = false; btn.textContent = '🗺 從地圖抓 4 間';
@@ -892,8 +893,8 @@ function pickFromMap(list, area, cui, cached, host){
   const pick = pool.slice(0,4);
   pick.forEach((r,i)=> fillRest(i, { name:r.name, url:'', addr:r.addr||'' }));
   for(let i=pick.length;i<4;i++) fillRest(i, { name:'', url:'', addr:'' });
-  rollNote('地圖上「'+area+'」附近共 '+list.length+' 間'+(use!==list?('，符合「'+cui+'」的 '+use.length+' 間'):'')+
-    '，抽出 '+pick.length+' 間'+(cached?'（沿用剛剛抓到的資料，再按可重抽）':(host?'（來源 '+host+'）':''))+
+  rollNote('地圖上「'+esc(area)+'」附近共 '+list.length+' 間'+(use!==list?('，符合「'+esc(cui)+'」的 '+use.length+' 間'):'')+
+    '，抽出 '+pick.length+' 間'+(cached?'（沿用剛剛抓到的資料，再按可重抽）':(host?'（來源 '+esc(host)+'）':''))+
     '。地圖資料可能有歇業或非聚餐型的店，發布前用「去 Google 看 ↗」確認一下。', false);
 }
 
@@ -919,7 +920,7 @@ function rollRestaurants(){
   pick.forEach((name,i)=> fillRest(i, { name:name, url:'' }));
 
   const own = pick.filter(n=> mine.indexOf(n)>=0).length;
-  rollNote('依「'+(area||'未指定地區')+'・'+sug.label+'」抽出 4 間'+
+  rollNote('依「'+esc(area||'未指定地區')+'・'+esc(sug.label)+'」抽出 4 間'+
     (own?('（自訂清單 '+own+' 間＋建議 '+(4-own)+' 間）'):'（建議名單）')+
     '，不喜歡就再按一次。連鎖店不一定每區都有，發布前用「去 Google 看 ↗」確認一下。');
 }
@@ -964,14 +965,9 @@ function delPool(i){
   const name = arr[i];
   arr.splice(i,1);
   setPool(arr);
-  rollNote(name ? ('已刪掉「'+name+'」。') : '');
+  rollNote(name ? ('已刪掉「'+esc(name)+'」。') : '');
 }
 function fillPool(){ renderPool(); }
-function rollNote(msg, warn){
-  const el = document.getElementById('rollStatus');
-  if(!el) return;
-  el.innerHTML = msg ? '<div class="flash'+(warn?' warn':'')+'" style="margin:12px 0 0">'+msg+'</div>' : '';
-}
 function rollRestaurants(){
   const pool = poolArr();
   if(pool.length < 4){
@@ -1449,6 +1445,10 @@ function render(){
   editing = !live;
   const ct = document.getElementById('copyTop');
   if(ct) ct.classList.toggle('hide', !(live && SID));
+  const nb = document.getElementById('notesBox');
+  if(nb) nb.classList.toggle('hide', !live);
+  const fn = document.getElementById('footerNote');
+  if(fn) fn.classList.toggle('hide', !live);
   document.getElementById('setupView').classList.toggle('hide', live);
   document.getElementById('voteView').classList.toggle('hide', !live);
   if(live){
