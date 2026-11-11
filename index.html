@@ -340,12 +340,11 @@ a.btn{text-decoration:none;display:inline-block}
     </div>
 
     <details class="notes hide" id="notesBox">
-      <summary>聚餐須知<span class="tag">預算・假單・12 月停辦</span></summary>
+      <summary>聚餐須知<span class="tag">預算・假單</span></summary>
       <ul>
         <li><b>單數月</b>決定聚餐地點和日期，選 4 天日期在群組通知大家投票。</li>
         <li>預算<b>每人 1000 元（含 10% 服務費）</b>，點餐時自行算好金額，超過的部分結帳時把錢給<b>親親</b>。</li>
         <li>晚班 <b>19:00</b> 提交公出假單，假別 <b>0501 公出</b>，請假說明填「部門聚餐」，記得帶公務機。</li>
-        <li><b>12 月</b>客資部停辦，讓大家去參加其他班的聖誕聚餐。</li>
       </ul>
       <div class="calc">
         每人 1000 ÷ 1.1 ＝ 餐點可點約 <b>909 元</b>
@@ -370,7 +369,6 @@ a.btn{text-decoration:none;display:inline-block}
       <label class="fld"><span class="lb">投票截止日</span>
         <button type="button" class="dfield" id="fld_deadline" onclick="openCal('deadline',this)"></button></label>
       <div class="grid-dates" id="dateInputs"></div>
-      <div id="decWarn"></div>
     </section>
 
     <section class="slip" id="restSetup">
@@ -639,7 +637,7 @@ function isoOf(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,
 function getDateVal(key){ return key==='deadline' ? (S.deadline||'') : (S.dates[+key.slice(1)]||''); }
 function setDateVal(key, v){
   if(key==='deadline') S.deadline = v; else S.dates[+key.slice(1)] = v;
-  renderDateFields(); checkDec();
+  renderDateFields();
 }
 function renderDateFields(){
   const put = (id,v)=>{
@@ -710,12 +708,6 @@ function buildDateInputs(){
     '<button type="button" class="dfield" id="fld_d'+i+'" onclick="openCal(\'d'+i+'\',this)"></button></div>'
   ).join('');
   renderDateFields();
-  checkDec();
-}
-function checkDec(){
-  const dec = S.dates.some(d=> d && new Date(d+'T00:00:00').getMonth()===11);
-  document.getElementById('decWarn').innerHTML = dec
-    ? '<div class="flash warn" style="margin:14px 0 0">選到 12 月了 — 客資部 12 月停辦，大家去參加其他班的聖誕聚餐。</div>' : '';
 }
 
 function buildRestCards(){
