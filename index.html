@@ -94,6 +94,7 @@ input[type=text],input[type=url],input[type=number],select,textarea{
   border:1px solid var(--line-2);border-radius:var(--r-s);padding:12px 13px;transition:.14s;
 }
 select{cursor:pointer}
+textarea{resize:vertical;line-height:1.7}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-tint)}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 
@@ -340,14 +341,22 @@ a.btn{text-decoration:none;display:inline-block}
     </div>
 
     <details class="notes hide" id="notesBox">
-      <summary>聚餐須知<span class="tag">預算・假單</span></summary>
-      <ul>
-        <li><b>單數月</b>決定聚餐地點和日期，選 4 天日期在群組通知大家投票。</li>
-        <li>預算<b>每人 1000 元（含 10% 服務費）</b>，點餐時自行算好金額，超過的部分結帳時把錢給<b>親親</b>。</li>
-        <li>晚班 <b>19:00</b> 提交公出假單，假別 <b>0501 公出</b>，請假說明填「部門聚餐」，記得帶公務機。</li>
-      </ul>
-      <div class="calc">
-        每人 1000 ÷ 1.1 ＝ 餐點可點約 <b>909 元</b>
+      <summary>聚餐須知<span class="tag" id="notesTag"></span></summary>
+      <div id="notesView">
+        <ul id="notesList"></ul>
+        <div class="calc" id="notesCalc"></div>
+        <div class="btnrow" style="margin:0 14px 14px"><button class="btn sm" onclick="editNotes()">編輯須知</button></div>
+      </div>
+      <div id="notesEdit" class="hide">
+        <label class="fld" style="margin:14px 14px 10px"><span class="lb">條列內容（一行一條，用 **文字** 可以變粗體）</span>
+          <textarea id="notesBox2" rows="6"></textarea></label>
+        <label class="fld" style="margin:0 14px 10px"><span class="lb">換算提示（留空就不顯示）</span>
+          <input type="text" id="notesCalcIn" placeholder="每人 1000 ÷ 1.1 ＝ 餐點可點約 **909 元**"></label>
+        <div class="btnrow" style="margin:0 14px 14px">
+          <button class="btn sm" id="notesSave" onclick="saveNotes()">儲存</button>
+          <button class="btn ghost sm" onclick="cancelNotes()">取消</button>
+        </div>
+        <p class="hint" style="padding:0 14px 14px;margin:0">儲存後所有人重新整理就會看到，之後開新一輪也會沿用這份內容。</p>
       </div>
     </details>
   </section>
@@ -505,6 +514,14 @@ const ROSTER = ['親親','維多','婧菱','Tobey','Nana'];
 const ROTA   = ['Tobey','婧菱','Nana'];
 const DOW    = ['日','一','二','三','四','五','六'];
 
+const DEFAULT_NOTES = [
+  '**單數月**決定聚餐地點和日期，選 4 天日期在群組通知大家投票。',
+  '預算**每人 1000 元（含 10% 服務費）**，點餐時自行算好金額，超過的部分結帳時把錢給**親親**。',
+  '晚班 **19:00** 提交公出假單，假別 **0501 公出**，請假說明填「部門聚餐」，記得帶公務機。'
+];
+const DEFAULT_CALC = '每人 1000 ÷ 1.1 ＝ 餐點可點約 **909 元**';
+const SETTINGS_ID = '_settings';
+
 let S = blank();
 let me = null;
 let draft = { plus:false, dates:[], rests:[] };
@@ -514,7 +531,9 @@ let editing = false;
 function blank(){
   return { fuwei:null, dates:['','','',''], restaurants:[
     {name:'',url:''},{name:'',url:''},{name:'',url:''},{name:'',url:''}
-  ], area:'', deadline:'', pool:'', published:false, votes:{}, updatedAt:null };
+  ], area:'', deadline:'', pool:'',
+  notes: DEFAULT_NOTES.slice(), calc: DEFAULT_CALC,
+  published:false, votes:{}, updatedAt:null };
 }
 
 /* ── Supabase 設定（只有這兩行要填） ── */
@@ -1431,6 +1450,70 @@ async function exportImage(){
   document.getElementById('imgModal').classList.remove('hide');
 }
 
+/* ── 聚餐須知（可編輯，存在共用設定列，新一輪會沿用） ── */
+function notesLine(s){ return esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'); }
+function notesArr(){
+  const n = S.notes;
+  return Array.isArray(n) ? n.filter(x=> String(x||'').trim()) : DEFAULT_NOTES.slice();
+}
+function renderNotes(){
+  const list = document.getElementById('notesList');
+  if(!list) return;
+  const arr = notesArr();
+  list.innerHTML = arr.map(l=>'<li>'+notesLine(l)+'</li>').join('');
+  const calcBox = document.getElementById('notesCalc');
+  const calc = String(S.calc||'').trim();
+  calcBox.innerHTML = calc ? notesLine(calc) : '';
+  calcBox.classList.toggle('hide', !calc);
+  const tag = document.getElementById('notesTag');
+  if(tag) tag.textContent = arr.length ? ('共 '+arr.length+' 條') : '尚未填寫';
+}
+function editNotes(){
+  document.getElementById('notesBox2').value = notesArr().join('\n');
+  document.getElementById('notesCalcIn').value = S.calc || '';
+  document.getElementById('notesView').classList.add('hide');
+  document.getElementById('notesEdit').classList.remove('hide');
+}
+function cancelNotes(){
+  document.getElementById('notesEdit').classList.add('hide');
+  document.getElementById('notesView').classList.remove('hide');
+}
+async function saveSettings(){
+  if(!ready()) return false;
+  try{
+    const res = await fetch(SUPA_URL+'/rest/v1/rpc/put_dinner',
+      { method:'POST', headers: heads(),
+        body: JSON.stringify({ sid: SETTINGS_ID, payload: { notes:S.notes, calc:S.calc } }) });
+    return res.ok;
+  }catch(e){ console.error(e); return false; }
+}
+async function loadSettings(){
+  if(!ready()) return null;
+  try{
+    const res = await fetch(SUPA_URL+'/rest/v1/rpc/get_dinner',
+      { method:'POST', headers: heads(), body: JSON.stringify({ sid: SETTINGS_ID }) });
+    if(!res.ok) return null;
+    return await res.json();
+  }catch(e){ console.error(e); return null; }
+}
+async function saveNotes(){
+  const lines = (document.getElementById('notesBox2').value||'')
+    .split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!lines.length){ flash('至少要留一條須知。','warn'); return; }
+  const btn = document.getElementById('notesSave');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>儲存中';
+  const latest = await load();
+  if(latest && latest.published) S = Object.assign(blank(), latest);
+  S.notes = lines;
+  S.calc = (document.getElementById('notesCalcIn').value||'').trim();
+  const ok = await save();
+  await saveSettings();
+  btn.disabled = false; btn.textContent = '儲存';
+  renderNotes();
+  cancelNotes();
+  flash(ok ? '須知已更新，其他人重新整理就看得到。' : '須知已更新，但存檔沒成功，再按一次儲存。', ok ? '' : 'warn');
+}
+
 /* ══ 主流程 ══ */
 function render(){
   const live = S.published;
@@ -1447,6 +1530,7 @@ function render(){
     document.getElementById('sealBadge').classList.remove('hide');
     document.getElementById('sealName').textContent = S.fuwei||'';
     document.getElementById('sealIni').textContent = (S.fuwei||'').charAt(0);
+    renderNotes();
     renderDeadline(); renderWho(); renderVoteOpts(); renderTally(); renderFinalForm();
   }else{
     renderRota(); buildDateInputs(); buildRestCards(); fillPool();
@@ -1484,6 +1568,10 @@ document.addEventListener('click', function(e){
 (async function init(){
   const saved = await load();
   if(saved && saved.published) S = Object.assign(blank(), saved);
+  else {
+    const st = await loadSettings();
+    if(st && Array.isArray(st.notes) && st.notes.length){ S.notes = st.notes; S.calc = st.calc || ''; }
+  }
   render();
   if(!ready()) flash('尚未設定 Supabase 專案網址，投票結果不會被保存。','warn');
   else if(SID && !S.published) flash('這組投票編號查不到資料，可能連結有誤，或資料庫正在喚醒中。','warn');
